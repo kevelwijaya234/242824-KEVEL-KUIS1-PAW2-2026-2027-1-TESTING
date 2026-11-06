@@ -1,5 +1,4 @@
-import z, { ZodError } from 'zod'
-
+import { ZodError } from 'zod'
 import { AppError } from '../errors/app-error.js'
 
 // eslint-disable-next-line no-unused-vars
@@ -8,11 +7,14 @@ export const errorHandler = (err, req, res, next) => {
   let message = err.message || 'Internal Server Error'
   let errors = err.errors || null
 
+  // 1. Handling Error Validasi Zod
   if (err instanceof ZodError) {
     statusCode = 422
     message = 'Validation error'
-    errors = z.flattenError(err).fieldErrors
-  } else if (err.code === 11000) {
+    errors = err.flatten().fieldErrors // ✅ Diperbaiki menggunakan err.flatten()
+  } 
+  // 2. Handling Error Duplicate Key MongoDB (E11000)
+  else if (err.code === 11000) {
     statusCode = 409
     const fields = err.keyValue ? Object.keys(err.keyValue) : []
     const fieldName = fields.join(', ') || 'field'
@@ -25,7 +27,14 @@ export const errorHandler = (err, req, res, next) => {
           ]),
         )
       : null
-  } else if (err.type === 'entity.parse.failed') {
+  } 
+  // 3. Handling Format ID MongoDB Tidak Valid (CastError)
+  else if (err.name === 'CastError') {
+    statusCode = 400
+    message = `Invalid ID format for ${err.path}`
+  }
+  // 4. Handling JSON Payload Rusak
+  else if (err.type === 'entity.parse.failed') {
     statusCode = 400
     message = 'Malformed JSON payload'
   }
